@@ -708,7 +708,7 @@
     const w = state.width;
     const h = state.height;
     const boatLength = clamp(Math.min(w, h) * (boatCount > 1 ? 0.36 : 0.43), 190, boatCount > 1 ? 320 : 390);
-    const beam = boatLength * 0.25;
+    const beam = boatLength * 0.36;
     const heading = boat.headingDeg * Math.PI / 180;
     const f = { x: Math.sin(heading), y: Math.cos(heading) };
     const aft = scale(f, -1);
@@ -1353,12 +1353,12 @@
     const L = rig.boatLength;
     const beam = rig.beam;
     const bow = toScreen(add(rig.center, scale(f, L * 0.55)));
-    const starShoulder = toScreen(add(add(rig.center, scale(f, L * 0.34)), scale(sb, beam * 0.40)));
-    const starWide = toScreen(add(add(rig.center, scale(f, -L * 0.08)), scale(sb, beam * 0.52)));
-    const starTransom = toScreen(add(add(rig.center, scale(f, -L * 0.46)), scale(sb, beam * 0.33)));
-    const portTransom = toScreen(add(add(rig.center, scale(f, -L * 0.46)), scale(sb, -beam * 0.33)));
-    const portWide = toScreen(add(add(rig.center, scale(f, -L * 0.08)), scale(sb, -beam * 0.52)));
-    const portShoulder = toScreen(add(add(rig.center, scale(f, L * 0.34)), scale(sb, -beam * 0.40)));
+    const starShoulder = toScreen(add(add(rig.center, scale(f, L * 0.34)), scale(sb, beam * 0.52)));
+    const starWide = toScreen(add(add(rig.center, scale(f, -L * 0.06)), scale(sb, beam * 0.64)));
+    const starTransom = toScreen(add(add(rig.center, scale(f, -L * 0.46)), scale(sb, beam * 0.50)));
+    const portTransom = toScreen(add(add(rig.center, scale(f, -L * 0.46)), scale(sb, -beam * 0.50)));
+    const portWide = toScreen(add(add(rig.center, scale(f, -L * 0.06)), scale(sb, -beam * 0.64)));
+    const portShoulder = toScreen(add(add(rig.center, scale(f, L * 0.34)), scale(sb, -beam * 0.52)));
 
     ctx.save();
     ctx.globalAlpha = rig.isActive ? 1 : 0.76;
@@ -1380,10 +1380,10 @@
     ctx.stroke();
 
     const innerBow = toScreen(add(rig.center, scale(f, L * 0.40)));
-    const innerStarMid = toScreen(add(add(rig.center, scale(f, -L * 0.04)), scale(sb, beam * 0.36)));
-    const innerStarAft = toScreen(add(add(rig.center, scale(f, -L * 0.38)), scale(sb, beam * 0.22)));
-    const innerPortAft = toScreen(add(add(rig.center, scale(f, -L * 0.38)), scale(sb, -beam * 0.22)));
-    const innerPortMid = toScreen(add(add(rig.center, scale(f, -L * 0.04)), scale(sb, -beam * 0.36)));
+    const innerStarMid = toScreen(add(add(rig.center, scale(f, -L * 0.04)), scale(sb, beam * 0.43)));
+    const innerStarAft = toScreen(add(add(rig.center, scale(f, -L * 0.38)), scale(sb, beam * 0.32)));
+    const innerPortAft = toScreen(add(add(rig.center, scale(f, -L * 0.38)), scale(sb, -beam * 0.32)));
+    const innerPortMid = toScreen(add(add(rig.center, scale(f, -L * 0.04)), scale(sb, -beam * 0.43)));
 
     ctx.beginPath();
     ctx.moveTo(innerBow.x, innerBow.y);
@@ -1432,14 +1432,14 @@
     ctx.fillText(badgeText, badge.x, badge.y + 0.5);
 
     ctx.beginPath();
-    drawWorldLine(add(add(rig.center, scale(f, L * 0.36)), scale(sb, beam * 0.28)), add(add(rig.center, scale(f, -L * 0.35)), scale(sb, beam * 0.18)));
-    drawWorldLine(add(add(rig.center, scale(f, L * 0.36)), scale(sb, -beam * 0.28)), add(add(rig.center, scale(f, -L * 0.35)), scale(sb, -beam * 0.18)));
+    drawWorldLine(add(add(rig.center, scale(f, L * 0.36)), scale(sb, beam * 0.38)), add(add(rig.center, scale(f, -L * 0.35)), scale(sb, beam * 0.30)));
+    drawWorldLine(add(add(rig.center, scale(f, L * 0.36)), scale(sb, -beam * 0.38)), add(add(rig.center, scale(f, -L * 0.35)), scale(sb, -beam * 0.30)));
     ctx.strokeStyle = "rgba(79, 93, 86, 0.28)";
     ctx.lineWidth = 1.2;
     ctx.stroke();
 
     ctx.beginPath();
-    drawWorldLine(add(add(rig.center, scale(f, -L * 0.10)), scale(sb, beam * 0.30)), add(add(rig.center, scale(f, -L * 0.10)), scale(sb, -beam * 0.30)));
+    drawWorldLine(add(add(rig.center, scale(f, -L * 0.10)), scale(sb, beam * 0.42)), add(add(rig.center, scale(f, -L * 0.10)), scale(sb, -beam * 0.42)));
     ctx.strokeStyle = "rgba(79, 93, 86, 0.56)";
     ctx.lineWidth = 4.5;
     ctx.lineCap = "round";
@@ -1460,7 +1460,7 @@
     ctx.stroke();
 
     ctx.beginPath();
-    drawWorldLine(add(rig.center, scale(f, -L * 0.44)), add(add(rig.center, scale(f, -L * 0.23)), scale(sb, beam * 0.12)));
+    drawWorldLine(add(rig.center, scale(f, -L * 0.44)), add(add(rig.center, scale(f, -L * 0.23)), scale(sb, beam * 0.18)));
     ctx.strokeStyle = "rgba(79, 93, 86, 0.72)";
     ctx.lineWidth = 2;
     ctx.stroke();
