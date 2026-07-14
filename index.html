@@ -1891,8 +1891,8 @@
     if (!boats.length) return;
 
     const compact = state.width < 620;
-    const width = compact ? 160 : 206;
-    const rowHeight = compact ? 82 : 92;
+    const width = compact ? 176 : 232;
+    const rowHeight = compact ? 106 : 128;
     const margin = compact ? 10 : 18;
     const x = Math.max(margin, state.width - width - margin);
     const y = compact ? 88 : 92;
@@ -1926,16 +1926,24 @@
     const depth = recommendedDaggerboardDepth(absHeading);
     const amount = depth / 100;
     const labelColor = rig.isActive ? "#087f7a" : "rgba(79, 93, 86, 0.86)";
-
-    const hullLeft = x + 9;
-    const hullRight = x + width - 9;
-    const hullY = y + height * 0.48;
-    const hullMid = x + width * 0.52;
-    const hullDepth = Math.max(12, height * 0.18);
-    const boardMax = Math.max(28, height * 0.42);
+    const top = y + 17;
+    const bottom = y + height - 4;
+    const profileHeight = bottom - top;
+    const sternX = x + width * 0.08;
+    const bowX = x + width * 0.94;
+    const hullTop = top + profileHeight * 0.67;
+    const hullBottom = top + profileHeight * 0.80;
+    const mastX = x + width * 0.63;
+    const mastTop = top + profileHeight * 0.03;
+    const mastBase = hullTop - 2;
+    const boomY = hullTop - profileHeight * 0.08;
+    const mainClewX = x + width * 0.17;
+    const mainClewY = boomY + profileHeight * 0.02;
+    const boardX = x + width * 0.52;
+    const boardTop = hullBottom - 2;
+    const boardMax = Math.max(24, profileHeight * 0.23);
     const boardVisible = boardMax * amount;
-    const boardTop = hullY + hullDepth * 0.20;
-    const boardHalf = Math.max(3, width * 0.026);
+    const boardHalf = Math.max(3, width * 0.024);
 
     ctx.save();
     ctx.font = "500 11px ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif";
@@ -1953,31 +1961,95 @@
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
+    ctx.fillStyle = "rgba(255, 255, 255, 0.40)";
     ctx.beginPath();
-    ctx.moveTo(hullLeft, hullY);
-    ctx.bezierCurveTo(x + width * 0.23, hullY - hullDepth * 0.85, x + width * 0.70, hullY - hullDepth * 0.82, hullRight, hullY - 1);
-    ctx.bezierCurveTo(x + width * 0.82, hullY + hullDepth * 0.95, x + width * 0.25, hullY + hullDepth * 1.10, hullLeft, hullY);
+    ctx.moveTo(mastX, mastTop);
+    ctx.bezierCurveTo(x + width * 0.43, top + profileHeight * 0.06, x + width * 0.27, top + profileHeight * 0.32, mainClewX, mainClewY);
+    ctx.lineTo(mastX, boomY);
+    ctx.closePath();
+    ctx.strokeStyle = "rgba(42, 50, 46, 0.66)";
+    ctx.fill();
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.moveTo(x + width * 0.24, hullY + hullDepth * 0.18);
-    ctx.lineTo(x + width * 0.78, hullY + hullDepth * 0.16);
-    ctx.strokeStyle = "rgba(79, 93, 86, 0.28)";
+    ctx.moveTo(mainClewX, boomY);
+    ctx.lineTo(mastX + width * 0.03, boomY - 1);
+    ctx.strokeStyle = "rgba(42, 50, 46, 0.74)";
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+
+    ctx.lineWidth = 1;
+    [0.30, 0.52, 0.74].forEach((t, index) => {
+      const battenY = lerp(mastTop, boomY, t);
+      const battenStartX = lerp(mastX, mainClewX, t) + width * 0.02;
+      ctx.beginPath();
+      ctx.moveTo(battenStartX, battenY);
+      ctx.lineTo(battenStartX + width * (0.11 - index * 0.018), battenY + profileHeight * 0.018);
+      ctx.strokeStyle = "rgba(42, 50, 46, 0.42)";
+      ctx.stroke();
+      ctx.fillStyle = "rgba(24, 32, 29, 0.80)";
+      ctx.beginPath();
+      ctx.arc(battenStartX + width * (0.12 - index * 0.018), battenY + profileHeight * 0.020, 2.2, 0, TAU);
+      ctx.fill();
+    });
+
+    if (rig.rigName === "twin") {
+      const jibHeadY = top + profileHeight * 0.36;
+      const jibClew = { x: x + width * 0.80, y: hullTop - profileHeight * 0.15 };
+      const jibTack = { x: bowX - width * 0.03, y: hullTop - 1 };
+      ctx.beginPath();
+      ctx.moveTo(mastX + width * 0.02, jibHeadY);
+      ctx.lineTo(jibClew.x, jibClew.y);
+      ctx.lineTo(jibTack.x, jibTack.y);
+      ctx.closePath();
+      ctx.fillStyle = "rgba(255, 255, 255, 0.34)";
+      ctx.strokeStyle = "rgba(42, 50, 46, 0.48)";
+      ctx.lineWidth = 1.1;
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(jibClew.x - width * 0.09, jibClew.y + profileHeight * 0.02);
+      ctx.lineTo(jibClew.x - width * 0.015, jibClew.y);
+      ctx.strokeStyle = "rgba(42, 50, 46, 0.30)";
+      ctx.stroke();
+      ctx.fillStyle = "rgba(24, 32, 29, 0.72)";
+      ctx.beginPath();
+      ctx.arc(jibClew.x - width * 0.005, jibClew.y - 1, 1.9, 0, TAU);
+      ctx.fill();
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(mastX, mastTop);
+    ctx.lineTo(mastX + width * 0.055, mastBase);
+    ctx.strokeStyle = "rgba(42, 50, 46, 0.68)";
+    ctx.lineWidth = 3.2;
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.moveTo(hullMid, boardTop);
-    ctx.lineTo(hullMid, boardTop + boardMax);
-    ctx.strokeStyle = "rgba(79, 93, 86, 0.22)";
-    ctx.setLineDash([5, 5]);
+    ctx.moveTo(sternX, hullTop);
+    ctx.bezierCurveTo(x + width * 0.20, hullTop - profileHeight * 0.07, x + width * 0.73, hullTop - profileHeight * 0.045, bowX, hullTop - profileHeight * 0.03);
+    ctx.bezierCurveTo(x + width * 0.91, hullBottom + profileHeight * 0.045, x + width * 0.23, hullBottom + profileHeight * 0.035, sternX, hullTop);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(255, 255, 255, 0.42)";
+    ctx.strokeStyle = "rgba(42, 50, 46, 0.56)";
+    ctx.lineWidth = 1.4;
+    ctx.fill();
     ctx.stroke();
-    ctx.setLineDash([]);
 
     ctx.beginPath();
-    ctx.moveTo(hullMid - boardHalf, boardTop);
-    ctx.lineTo(hullMid + boardHalf, boardTop);
-    ctx.lineTo(hullMid + boardHalf * 0.55, boardTop + boardVisible);
-    ctx.quadraticCurveTo(hullMid, boardTop + boardVisible + 5, hullMid - boardHalf * 0.55, boardTop + boardVisible);
+    ctx.moveTo(sternX + width * 0.02, hullTop + profileHeight * 0.01);
+    ctx.bezierCurveTo(sternX - width * 0.02, hullTop + profileHeight * 0.09, sternX - width * 0.03, hullBottom + profileHeight * 0.19, sternX + width * 0.01, hullBottom + profileHeight * 0.23);
+    ctx.lineTo(sternX + width * 0.045, hullTop + profileHeight * 0.02);
+    ctx.strokeStyle = "rgba(42, 50, 46, 0.50)";
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(boardX - boardHalf, boardTop);
+    ctx.lineTo(boardX + boardHalf, boardTop);
+    ctx.lineTo(boardX + boardHalf * 0.60, boardTop + boardVisible);
+    ctx.quadraticCurveTo(boardX, boardTop + boardVisible + 5, boardX - boardHalf * 0.60, boardTop + boardVisible);
     ctx.closePath();
     ctx.fillStyle = "rgba(8, 127, 122, 0.70)";
     ctx.strokeStyle = "rgba(8, 127, 122, 0.92)";
@@ -1988,8 +2060,8 @@
     ctx.strokeStyle = "rgba(79, 93, 86, 0.22)";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(x, y + height - 2);
-    ctx.lineTo(x + width, y + height - 2);
+    ctx.moveTo(x, bottom);
+    ctx.lineTo(x + width, bottom);
     ctx.stroke();
     ctx.restore();
   }
