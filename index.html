@@ -1119,13 +1119,13 @@
       ctx.arc(lowA.x, lowA.y, radius, 0, TAU);
       ctx.fill();
 
-      g = ctx.createRadialGradient(highA.x, highA.y, 2, highA.x, highA.y, radius * 0.82);
-      g.addColorStop(0, `rgba(216, 111, 52, ${0.40 * lift})`);
-      g.addColorStop(0.46, `rgba(216, 111, 52, ${0.18 * lift})`);
+      g = ctx.createRadialGradient(highA.x, highA.y, 2, highA.x, highA.y, radius * 0.98);
+      g.addColorStop(0, `rgba(216, 111, 52, ${0.52 * lift})`);
+      g.addColorStop(0.46, `rgba(216, 111, 52, ${0.26 * lift})`);
       g.addColorStop(1, "rgba(216, 111, 52, 0)");
       ctx.fillStyle = g;
       ctx.beginPath();
-      ctx.arc(highA.x, highA.y, radius * 0.82, 0, TAU);
+      ctx.arc(highA.x, highA.y, radius * 0.98, 0, TAU);
       ctx.fill();
     }
     ctx.restore();
@@ -1929,10 +1929,10 @@
   }
 
   function sailDistanceToPoint(sail, p) {
-    let previous = sailSurfacePoint(sail, 0, 0);
+    let previous = sailSurfacePoint(sail, 0.75, 0);
     let closest = length(sub(p, sail.b));
-    for (let i = 1; i <= 26; i += 1) {
-      const next = sailSurfacePoint(sail, i / 26, 0);
+    for (let i = 1; i <= 10; i += 1) {
+      const next = sailSurfacePoint(sail, 0.75 + i * 0.25 / 10, 0);
       closest = Math.min(closest, distanceToSegment(p, previous, next));
       previous = next;
     }
