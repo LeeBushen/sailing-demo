@@ -230,7 +230,8 @@
       .wind-label {
         position: absolute;
         top: 18px;
-        right: 18px;
+        left: 50%;
+        transform: translateX(-50%);
         display: flex;
         align-items: center;
         gap: 10px;
@@ -355,7 +356,7 @@
 
         .wind-label {
           top: 10px;
-          right: 10px;
+          left: 50%;
           padding: 8px 10px;
         }
 
@@ -409,6 +410,7 @@
           <button type="button" class="icon-button" id="pressure-toggle" aria-pressed="true">Pressure tint</button>
           <button type="button" class="icon-button" id="vectors-toggle" aria-pressed="true">Animated wind arrows</button>
           <button type="button" class="icon-button" id="eddies-toggle" aria-pressed="true">Eddy guides</button>
+          <button type="button" class="icon-button" id="centreboard-toggle" aria-pressed="true">Centreboard position guide</button>
         </div>
 
         <div class="metric-grid" aria-label="Live sail metrics">
@@ -471,6 +473,7 @@
   const pressureToggle = root.querySelector("#pressure-toggle");
   const vectorsToggle = root.querySelector("#vectors-toggle");
   const eddiesToggle = root.querySelector("#eddies-toggle");
+  const centreboardToggle = root.querySelector("#centreboard-toggle");
   const headingValue = root.querySelector("#heading-value");
   const mainValue = root.querySelector("#main-value");
   const jibValue = root.querySelector("#jib-value");
@@ -514,6 +517,7 @@
     pressure: true,
     vectors: true,
     eddies: true,
+    centreboardGuide: true,
     dpr: 1,
     width: 0,
     height: 0,
@@ -749,6 +753,7 @@
     pressureToggle.setAttribute("aria-pressed", String(state.pressure));
     vectorsToggle.setAttribute("aria-pressed", String(state.vectors));
     eddiesToggle.setAttribute("aria-pressed", String(state.eddies));
+    centreboardToggle.setAttribute("aria-pressed", String(state.centreboardGuide));
   }
 
   function buildRig(boat, boatIndex, displayIndex, boatCount) {
@@ -1902,6 +1907,7 @@
   }
 
   function drawDaggerboardProfiles(scene) {
+    if (!state.centreboardGuide) return;
     const boats = scene.boats;
     if (!boats.length) return;
 
@@ -1929,7 +1935,7 @@
     ctx.fillStyle = "rgba(79, 93, 86, 0.76)";
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText("BOARD POSITION GUIDE", x + 12, y + 16);
+    ctx.fillText("CENTREBOARD POSITION GUIDE", x + 12, y + 16);
 
     boats.forEach((boat, index) => {
       drawDaggerboardProfile(boat, x + 10, y + 30 + index * rowHeight, width - 20, rowHeight - 8);
@@ -2368,6 +2374,12 @@
 
   eddiesToggle.addEventListener("click", () => {
     state.eddies = !state.eddies;
+    updateControls();
+    paintBackground();
+  });
+
+  centreboardToggle.addEventListener("click", () => {
+    state.centreboardGuide = !state.centreboardGuide;
     updateControls();
     paintBackground();
   });
