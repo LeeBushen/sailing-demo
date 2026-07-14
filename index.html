@@ -501,6 +501,7 @@
         headingDeg: Number(headingInput.value),
         mainDeg: Number(mainInput.value),
         jibDeg: Number(jibInput.value),
+        tillerDeg: 0,
         x: 0,
         y: 0
       },
@@ -510,6 +511,7 @@
         headingDeg: -75,
         mainDeg: recommendedTrim(75, "main"),
         jibDeg: recommendedTrim(75, "jib"),
+        tillerDeg: 0,
         x: 270,
         y: 0
       }
@@ -527,6 +529,7 @@
     drag: null,
     lastHeadingDragDeg: null,
     lastSailDragValue: null,
+    lastTillerDragDeg: null,
     lastTime: performance.now(),
     reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches
   };
@@ -738,7 +741,7 @@
   function updateControls() {
     updateActiveBoatFromInputs();
     const boat = activeBoat();
-    headingValue.textContent = `${Math.abs(boat.headingDeg)} deg ${signedSideLabel(boat.headingDeg)}`;
+    headingValue.textContent = `${Math.round(Math.abs(boat.headingDeg))} deg ${signedSideLabel(boat.headingDeg)}`;
     mainValue.textContent = formatDegrees(boat.mainDeg);
     jibValue.textContent = formatDegrees(boat.jibDeg);
     boatOne.setAttribute("aria-pressed", String(state.activeBoat === 0));
@@ -825,6 +828,7 @@
       tack,
       noGo,
       downwind,
+      tillerDeg: boat.tillerDeg || 0,
       sails
     };
   }
@@ -1512,18 +1516,7 @@
     ctx.lineCap = "round";
     ctx.stroke();
 
-    ctx.beginPath();
-    drawWorldLine(add(rig.center, scale(f, -L * 0.48)), add(rig.center, scale(f, -L * 0.63)));
-    ctx.strokeStyle = "#4f5d56";
-    ctx.lineWidth = 6;
-    ctx.lineCap = "round";
-    ctx.stroke();
-
-    ctx.beginPath();
-    drawWorldLine(add(rig.center, scale(f, -L * 0.44)), add(add(rig.center, scale(f, -L * 0.23)), scale(sb, beam * 0.18)));
-    ctx.strokeStyle = "rgba(79, 93, 86, 0.72)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    drawTillerRudder(rig);
 
     drawSideLabel(
       "STARBOARD",
@@ -1552,15 +1545,69 @@
     ctx.restore();
   }
 
-  function headingHandleRadius(rig) {
-    return Math.max(22 / state.zoom, rig.boatLength * 0.065);
-  }
-
   function boatHandlePoints(rig) {
     return {
-      bow: add(rig.center, scale(rig.f, rig.boatLength * 0.53)),
-      stern: add(rig.center, scale(rig.f, -rig.boatLength * 0.54))
+      bow: add(rig.center, scale(rig.f, rig.boatLength * 0.53))
     };
+  }
+
+  function bowMoveHitAtPoint(rig, p) {
+    const bow = boatHandlePoints(rig).bow;
+    const rel = sub(p, rig.center);
+    const hx = dot(rel, rig.f);
+    const hy = Math.abs(dot(rel, rig.starboard));
+    const hitRadius = Math.max(24 / state.zoom, rig.boatLength * 0.075);
+    return length(sub(p, bow)) <= hitRadius || (hx > rig.boatLength * 0.34 && hy < rig.beam * 0.40);
+  }
+
+  function tillerRudderGeometry(rig, overrideDeg = null) {
+    const angle = (overrideDeg === null ? rig.tillerDeg : overrideDeg) * Math.PI / 180;
+    const stock = add(rig.center, scale(rig.f, -rig.boatLength * 0.49));
+    const axis = normalize(add(scale(rig.f, Math.cos(angle)), scale(rig.starboard, Math.sin(angle))));
+    const side = normalLeft(axis);
+    const forwardTip = add(stock, scale(axis, rig.boatLength * 0.25));
+    const aftTip = add(stock, scale(axis, -rig.boatLength * 0.17));
+    const halfWidth = rig.beam * 0.038;
+
+    return {
+      stock,
+      axis,
+      forwardTip,
+      aftTip,
+      rectangle: [
+        add(forwardTip, scale(side, halfWidth)),
+        add(aftTip, scale(side, halfWidth * 0.82)),
+        add(aftTip, scale(side, -halfWidth * 0.82)),
+        add(forwardTip, scale(side, -halfWidth))
+      ]
+    };
+  }
+
+  function drawTillerRudder(rig) {
+    const geometry = tillerRudderGeometry(rig);
+    const points = geometry.rectangle.map(toScreen);
+    const stock = toScreen(geometry.stock);
+
+    ctx.save();
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i += 1) {
+      ctx.lineTo(points[i].x, points[i].y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = rig.isActive ? "rgba(8, 127, 122, 0.24)" : "rgba(79, 93, 86, 0.18)";
+    ctx.strokeStyle = rig.isActive ? "rgba(8, 127, 122, 0.86)" : "rgba(79, 93, 86, 0.62)";
+    ctx.lineWidth = rig.isActive ? 2 : 1.4;
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(stock.x, stock.y, clamp(rig.boatLength * 0.013, 3.2, 5), 0, TAU);
+    ctx.fillStyle = "rgba(55, 70, 62, 0.90)";
+    ctx.fill();
+    ctx.restore();
   }
 
   function drawSideLabel(text, anchorWorld, labelWorld, color) {
@@ -2128,6 +2175,12 @@
     return length(sub(p, nearest));
   }
 
+  function tillerRudderHitAtPoint(rig, p) {
+    const geometry = tillerRudderGeometry(rig);
+    const hitRadius = Math.max(14 / state.zoom, rig.boatLength * 0.034);
+    return distanceToSegment(p, geometry.aftTip, geometry.forwardTip) <= hitRadius;
+  }
+
   function sailDistanceToPoint(sail, p) {
     let previous = sailSurfacePoint(sail, 0.75, 0);
     let closest = length(sub(p, sail.b));
@@ -2158,25 +2211,6 @@
     return null;
   }
 
-  function headingDragEndForPoint(rig, p) {
-    const rel = sub(p, rig.center);
-    const hx = dot(rel, rig.f);
-    const hy = Math.abs(dot(rel, rig.starboard));
-    const handles = boatHandlePoints(rig);
-    const handleRadius = headingHandleRadius(rig);
-    const bowDistance = length(sub(p, handles.bow));
-    const sternDistance = length(sub(p, handles.stern));
-    const narrowEnough = hy < rig.beam * 0.58;
-
-    if (bowDistance < handleRadius * 1.35 || (narrowEnough && hx > rig.boatLength * 0.26)) {
-      return "bow";
-    }
-    if (sternDistance < handleRadius * 1.35 || (narrowEnough && hx < -rig.boatLength * 0.30)) {
-      return "stern";
-    }
-    return null;
-  }
-
   function findCanvasHitAtPoint(p) {
     return findSailHitAtPoint(p) || findBoatHitAtPoint(p);
   }
@@ -2185,13 +2219,18 @@
     const scene = buildScene();
     for (let i = scene.boats.length - 1; i >= 0; i -= 1) {
       const rig = scene.boats[i];
-      if (!boatContainsPoint(rig, p)) continue;
-      const headingEnd = headingDragEndForPoint(rig, p);
-      return {
-        rig,
-        mode: headingEnd ? "heading" : "move",
-        headingEnd
-      };
+      if (tillerRudderHitAtPoint(rig, p)) {
+        return {
+          rig,
+          mode: "tiller"
+        };
+      }
+      if (bowMoveHitAtPoint(rig, p)) {
+        return {
+          rig,
+          mode: "move"
+        };
+      }
     }
     return null;
   }
@@ -2199,29 +2238,6 @@
   function findBoatAtPoint(p) {
     const hit = findBoatHitAtPoint(p);
     return hit ? hit.rig : null;
-  }
-
-  function updateHeadingFromPointer(drag, p) {
-    const boat = state.boats[drag.boatIndex];
-    const center = { x: boat.x, y: boat.y };
-    const v = sub(p, center);
-    if (length(v) < 12 / state.zoom) return;
-
-    const headingRad = drag.headingEnd === "stern"
-      ? Math.atan2(-v.x, -v.y)
-      : Math.atan2(v.x, v.y);
-    const nextHeading = Math.round(normalizeHeadingDeg(headingRad * 180 / Math.PI));
-    if (Math.abs(nextHeading - boat.headingDeg) < 0.5) return;
-
-    boat.headingDeg = nextHeading;
-    setRecommendedTrimForBoat(boat);
-    syncInputsFromActiveBoat();
-    updateControls();
-
-    if (state.lastHeadingDragDeg === null || Math.abs(nextHeading - state.lastHeadingDragDeg) >= 2) {
-      paintBackground();
-      state.lastHeadingDragDeg = nextHeading;
-    }
   }
 
   function updateSailTrimFromPointer(drag, p) {
@@ -2251,6 +2267,38 @@
     }
   }
 
+  function updateTillerFromPointer(drag, p) {
+    const boat = state.boats[drag.boatIndex];
+    const side = dot(sub(p, drag.stock), drag.starboard);
+    const pointerFraction = clamp(side / (drag.beam * 0.52), -1, 1);
+    const delta = pointerFraction - drag.startPointerFraction;
+    const nextTiller = clamp(drag.startTillerDeg + delta * 32, -32, 32);
+    const nextHeading = normalizeHeadingDeg(drag.startHeading - delta * 56);
+    const headingChanged = Math.abs(nextHeading - boat.headingDeg) >= 0.5;
+    const tillerChanged = Math.abs(nextTiller - (boat.tillerDeg || 0)) >= 0.5;
+
+    if (!headingChanged && !tillerChanged) return;
+
+    boat.tillerDeg = nextTiller;
+    if (headingChanged) {
+      boat.headingDeg = nextHeading;
+      setRecommendedTrimForBoat(boat);
+    }
+    syncInputsFromActiveBoat();
+    updateControls();
+
+    if (
+      state.lastTillerDragDeg === null ||
+      Math.abs(nextTiller - state.lastTillerDragDeg) >= 1 ||
+      state.lastHeadingDragDeg === null ||
+      Math.abs(nextHeading - state.lastHeadingDragDeg) >= 1
+    ) {
+      paintBackground();
+      state.lastTillerDragDeg = nextTiller;
+      state.lastHeadingDragDeg = nextHeading;
+    }
+  }
+
   function handlePointerDown(event) {
     if (event.button !== undefined && event.button !== 0) return;
     const p = eventWorldPoint(event);
@@ -2260,6 +2308,7 @@
     event.preventDefault();
     selectBoat(hit.rig.boatIndex);
     const boat = state.boats[hit.rig.boatIndex];
+    const tillerGeometry = hit.mode === "tiller" ? tillerRudderGeometry(hit.rig) : null;
     state.drag = hit.mode === "sail"
       ? {
         type: "sail",
@@ -2267,12 +2316,17 @@
         boatIndex: hit.rig.boatIndex,
         sailName: hit.sailName
       }
-      : hit.mode === "heading"
+      : hit.mode === "tiller"
       ? {
-        type: "heading",
+        type: "tiller",
         pointerId: event.pointerId,
         boatIndex: hit.rig.boatIndex,
-        headingEnd: hit.headingEnd
+        startHeading: boat.headingDeg,
+        startTillerDeg: boat.tillerDeg || 0,
+        startPointerFraction: clamp(dot(sub(p, tillerGeometry.stock), hit.rig.starboard) / (hit.rig.beam * 0.52), -1, 1),
+        stock: tillerGeometry.stock,
+        starboard: hit.rig.starboard,
+        beam: hit.rig.beam
       }
       : {
         type: "move",
@@ -2285,9 +2339,10 @@
       const key = state.drag.sailName === "main" ? "mainDeg" : "jibDeg";
       state.lastSailDragValue = boat[key];
       updateSailTrimFromPointer(state.drag, p);
-    } else if (state.drag.type === "heading") {
+    } else if (state.drag.type === "tiller") {
       state.lastHeadingDragDeg = boat.headingDeg;
-      updateHeadingFromPointer(state.drag, p);
+      state.lastTillerDragDeg = boat.tillerDeg || 0;
+      updateTillerFromPointer(state.drag, p);
     }
     canvas.setPointerCapture(event.pointerId);
     canvas.style.cursor = "grabbing";
@@ -2297,10 +2352,10 @@
     const p = eventWorldPoint(event);
     if (state.drag) {
       event.preventDefault();
-      if (state.drag.type === "heading") {
-        updateHeadingFromPointer(state.drag, p);
-      } else if (state.drag.type === "sail") {
+      if (state.drag.type === "sail") {
         updateSailTrimFromPointer(state.drag, p);
+      } else if (state.drag.type === "tiller") {
+        updateTillerFromPointer(state.drag, p);
       } else {
         const boat = state.boats[state.drag.boatIndex];
         boat.x = p.x + state.drag.offsetX;
@@ -2322,6 +2377,7 @@
     state.drag = null;
     state.lastHeadingDragDeg = null;
     state.lastSailDragValue = null;
+    state.lastTillerDragDeg = null;
     canvas.style.cursor = "grab";
   }
 
