@@ -1551,13 +1551,20 @@
     };
   }
 
-  function bowMoveHitAtPoint(rig, p) {
+  function bowHeadingHitAtPoint(rig, p) {
     const bow = boatHandlePoints(rig).bow;
     const rel = sub(p, rig.center);
     const hx = dot(rel, rig.f);
     const hy = Math.abs(dot(rel, rig.starboard));
     const hitRadius = Math.max(24 / state.zoom, rig.boatLength * 0.075);
     return length(sub(p, bow)) <= hitRadius || (hx > rig.boatLength * 0.34 && hy < rig.beam * 0.40);
+  }
+
+  function boatMoveHitAtPoint(rig, p) {
+    const rel = sub(p, rig.center);
+    const hx = dot(rel, rig.f);
+    const hy = Math.abs(dot(rel, rig.starboard));
+    return boatContainsPoint(rig, p) && hx > -rig.boatLength * 0.28 && hx < rig.boatLength * 0.24 && hy < rig.beam * 0.46;
   }
 
   function tillerRudderGeometry(rig, overrideDeg = null) {
@@ -1567,7 +1574,7 @@
     const side = normalLeft(axis);
     const forwardTip = add(stock, scale(axis, rig.boatLength * 0.25));
     const aftTip = add(stock, scale(axis, -rig.boatLength * 0.17));
-    const halfWidth = rig.beam * 0.038;
+    const halfWidth = rig.beam * 0.016;
 
     return {
       stock,
@@ -1599,7 +1606,7 @@
     ctx.closePath();
     ctx.fillStyle = rig.isActive ? "rgba(8, 127, 122, 0.24)" : "rgba(79, 93, 86, 0.18)";
     ctx.strokeStyle = rig.isActive ? "rgba(8, 127, 122, 0.86)" : "rgba(79, 93, 86, 0.62)";
-    ctx.lineWidth = rig.isActive ? 2 : 1.4;
+    ctx.lineWidth = rig.isActive ? 1.4 : 1;
     ctx.fill();
     ctx.stroke();
 
@@ -2177,7 +2184,7 @@
 
   function tillerRudderHitAtPoint(rig, p) {
     const geometry = tillerRudderGeometry(rig);
-    const hitRadius = Math.max(14 / state.zoom, rig.boatLength * 0.034);
+    const hitRadius = Math.max(18 / state.zoom, rig.boatLength * 0.044);
     return distanceToSegment(p, geometry.aftTip, geometry.forwardTip) <= hitRadius;
   }
 
@@ -2225,7 +2232,13 @@
           mode: "tiller"
         };
       }
-      if (bowMoveHitAtPoint(rig, p)) {
+      if (bowHeadingHitAtPoint(rig, p)) {
+        return {
+          rig,
+          mode: "heading"
+        };
+      }
+      if (boatMoveHitAtPoint(rig, p)) {
         return {
           rig,
           mode: "move"
@@ -2264,6 +2277,26 @@
     if (state.lastSailDragValue === null || Math.abs(nextTrim - state.lastSailDragValue) >= 2) {
       paintBackground();
       state.lastSailDragValue = nextTrim;
+    }
+  }
+
+  function updateBowHeadingFromPointer(drag, p) {
+    const boat = state.boats[drag.boatIndex];
+    const v = sub(p, drag.center);
+    if (length(v) < 12 / state.zoom) return;
+
+    const headingRad = Math.atan2(v.x, v.y);
+    const nextHeading = Math.round(normalizeHeadingDeg(headingRad * 180 / Math.PI));
+    if (Math.abs(nextHeading - boat.headingDeg) < 0.5) return;
+
+    boat.headingDeg = nextHeading;
+    setRecommendedTrimForBoat(boat);
+    syncInputsFromActiveBoat();
+    updateControls();
+
+    if (state.lastHeadingDragDeg === null || Math.abs(nextHeading - state.lastHeadingDragDeg) >= 1) {
+      paintBackground();
+      state.lastHeadingDragDeg = nextHeading;
     }
   }
 
@@ -2316,6 +2349,13 @@
         boatIndex: hit.rig.boatIndex,
         sailName: hit.sailName
       }
+      : hit.mode === "heading"
+      ? {
+        type: "heading",
+        pointerId: event.pointerId,
+        boatIndex: hit.rig.boatIndex,
+        center: { x: boat.x, y: boat.y }
+      }
       : hit.mode === "tiller"
       ? {
         type: "tiller",
@@ -2339,6 +2379,9 @@
       const key = state.drag.sailName === "main" ? "mainDeg" : "jibDeg";
       state.lastSailDragValue = boat[key];
       updateSailTrimFromPointer(state.drag, p);
+    } else if (state.drag.type === "heading") {
+      state.lastHeadingDragDeg = boat.headingDeg;
+      updateBowHeadingFromPointer(state.drag, p);
     } else if (state.drag.type === "tiller") {
       state.lastHeadingDragDeg = boat.headingDeg;
       state.lastTillerDragDeg = boat.tillerDeg || 0;
@@ -2354,6 +2397,8 @@
       event.preventDefault();
       if (state.drag.type === "sail") {
         updateSailTrimFromPointer(state.drag, p);
+      } else if (state.drag.type === "heading") {
+        updateBowHeadingFromPointer(state.drag, p);
       } else if (state.drag.type === "tiller") {
         updateTillerFromPointer(state.drag, p);
       } else {
