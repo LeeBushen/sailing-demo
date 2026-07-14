@@ -627,6 +627,20 @@
     return "Run";
   }
 
+  function recommendedDaggerboardDepth(absHeading) {
+    const boardPoints = [
+      [0, 100],
+      [45, 100],
+      [60, 92],
+      [75, 78],
+      [90, 65],
+      [120, 48],
+      [150, 34],
+      [180, 25]
+    ];
+    return interpolateTrim(absHeading, boardPoints);
+  }
+
   function interpolateTrim(absHeading, points) {
     if (absHeading <= points[0][0]) return points[0][1];
     for (let i = 1; i < points.length; i += 1) {
@@ -1872,6 +1886,114 @@
     ctx.restore();
   }
 
+  function drawDaggerboardProfiles(scene) {
+    const boats = scene.boats;
+    if (!boats.length) return;
+
+    const compact = state.width < 620;
+    const width = compact ? 160 : 206;
+    const rowHeight = compact ? 82 : 92;
+    const margin = compact ? 10 : 18;
+    const x = Math.max(margin, state.width - width - margin);
+    const y = compact ? 88 : 92;
+    const height = 30 + boats.length * rowHeight + 10;
+
+    ctx.save();
+    ctx.globalAlpha = 0.92;
+    ctx.fillStyle = "rgba(255, 255, 255, 0.68)";
+    ctx.strokeStyle = "rgba(79, 93, 86, 0.25)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(x, y, width, height, 8);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.font = "500 11px ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif";
+    ctx.fillStyle = "rgba(79, 93, 86, 0.76)";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText("BOARD DEPTH", x + 12, y + 16);
+
+    boats.forEach((boat, index) => {
+      drawDaggerboardProfile(boat, x + 10, y + 30 + index * rowHeight, width - 20, rowHeight - 8);
+    });
+    ctx.restore();
+  }
+
+  function drawDaggerboardProfile(rig, x, y, width, height) {
+    const absHeading = Math.abs(rig.headingDeg);
+    const point = pointOfSail(absHeading);
+    const depth = recommendedDaggerboardDepth(absHeading);
+    const amount = depth / 100;
+    const labelColor = rig.isActive ? "#087f7a" : "rgba(79, 93, 86, 0.86)";
+
+    const hullLeft = x + 9;
+    const hullRight = x + width - 9;
+    const hullY = y + height * 0.48;
+    const hullMid = x + width * 0.52;
+    const hullDepth = Math.max(12, height * 0.18);
+    const boardMax = Math.max(28, height * 0.42);
+    const boardVisible = boardMax * amount;
+    const boardTop = hullY + hullDepth * 0.20;
+    const boardHalf = Math.max(3, width * 0.026);
+
+    ctx.save();
+    ctx.font = "500 11px ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = labelColor;
+    ctx.fillText(`${rig.label}: ${point}`, x, y + 9);
+
+    ctx.textAlign = "right";
+    ctx.fillStyle = "rgba(24, 32, 29, 0.84)";
+    ctx.fillText(`${depth}% down`, x + width, y + 9);
+
+    ctx.strokeStyle = "rgba(79, 93, 86, 0.55)";
+    ctx.lineWidth = 1.3;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    ctx.beginPath();
+    ctx.moveTo(hullLeft, hullY);
+    ctx.bezierCurveTo(x + width * 0.23, hullY - hullDepth * 0.85, x + width * 0.70, hullY - hullDepth * 0.82, hullRight, hullY - 1);
+    ctx.bezierCurveTo(x + width * 0.82, hullY + hullDepth * 0.95, x + width * 0.25, hullY + hullDepth * 1.10, hullLeft, hullY);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x + width * 0.24, hullY + hullDepth * 0.18);
+    ctx.lineTo(x + width * 0.78, hullY + hullDepth * 0.16);
+    ctx.strokeStyle = "rgba(79, 93, 86, 0.28)";
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(hullMid, boardTop);
+    ctx.lineTo(hullMid, boardTop + boardMax);
+    ctx.strokeStyle = "rgba(79, 93, 86, 0.22)";
+    ctx.setLineDash([5, 5]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.beginPath();
+    ctx.moveTo(hullMid - boardHalf, boardTop);
+    ctx.lineTo(hullMid + boardHalf, boardTop);
+    ctx.lineTo(hullMid + boardHalf * 0.55, boardTop + boardVisible);
+    ctx.quadraticCurveTo(hullMid, boardTop + boardVisible + 5, hullMid - boardHalf * 0.55, boardTop + boardVisible);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(8, 127, 122, 0.70)";
+    ctx.strokeStyle = "rgba(8, 127, 122, 0.92)";
+    ctx.lineWidth = 1.4;
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.strokeStyle = "rgba(79, 93, 86, 0.22)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, y + height - 2);
+    ctx.lineTo(x + width, y + height - 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   function updateMetrics(rig, performance) {
     const absHeading = Math.abs(rig.headingDeg);
     const main = rig.sails.find((s) => s.name === "main");
@@ -1907,6 +2029,7 @@
     }
     drawSailSurfaceFlow(scene, now);
     drawTelltales(scene, now);
+    drawDaggerboardProfiles(scene);
     updateMetrics(activeRig, performance);
 
     requestAnimationFrame(frame);
