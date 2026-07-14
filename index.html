@@ -628,8 +628,8 @@
   }
 
   function recommendedDaggerboardDepth(absHeading) {
-    // Training guide: sailing sources agree on full board upwind and less board downwind;
-    // these percentages interpolate that guidance for a clear visual demo.
+    // Training guide: sources agree on full board upwind and less board downwind;
+    // this value drives the pivot angle while the display stays qualitative.
     const boardPoints = [
       [0, 100],
       [45, 100],
@@ -641,6 +641,12 @@
       [180, 25]
     ];
     return interpolateTrim(absHeading, boardPoints);
+  }
+
+  function daggerboardDepthLabel(depth) {
+    if (depth >= 92) return "Fully down";
+    if (depth <= 30) return "Fully up";
+    return "Partially up";
   }
 
   function interpolateTrim(absHeading, points) {
@@ -1894,10 +1900,14 @@
 
     const compact = state.width < 620;
     const margin = compact ? 10 : 18;
-    const width = Math.min(state.width - margin * 2, compact ? 260 : 420);
-    const rowHeight = compact ? 132 : 170;
+    const width = Math.min(state.width - margin * 2, compact ? 330 : 470);
     const x = Math.max(margin, state.width - width - margin);
     const y = compact ? 88 : 92;
+    const rowTarget = boats.length > 1
+      ? (compact ? 210 : 260)
+      : (compact ? 280 : 360);
+    const availableRows = Math.max(boats.length * (compact ? 170 : 220), state.height - y - margin - 40);
+    const rowHeight = Math.min(rowTarget, Math.floor(availableRows / boats.length));
     const height = 30 + boats.length * rowHeight + 10;
 
     ctx.save();
@@ -1914,7 +1924,7 @@
     ctx.fillStyle = "rgba(79, 93, 86, 0.76)";
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText("BOARD DEPTH GUIDE", x + 12, y + 16);
+    ctx.fillText("BOARD POSITION GUIDE", x + 12, y + 16);
 
     boats.forEach((boat, index) => {
       drawDaggerboardProfile(boat, x + 10, y + 30 + index * rowHeight, width - 20, rowHeight - 8);
@@ -1926,26 +1936,26 @@
     const absHeading = Math.abs(rig.headingDeg);
     const point = pointOfSail(absHeading);
     const depth = recommendedDaggerboardDepth(absHeading);
-    const amount = depth / 100;
+    const amount = clamp(depth / 100, 0, 1);
+    const boardLabel = daggerboardDepthLabel(depth);
     const labelColor = rig.isActive ? "#087f7a" : "rgba(79, 93, 86, 0.86)";
-    const top = y + 17;
-    const bottom = y + height - 4;
+    const top = y + 25;
+    const bottom = y + height - 8;
     const profileHeight = bottom - top;
     const sternX = x + width * 0.08;
     const bowX = x + width * 0.94;
-    const hullTop = top + profileHeight * 0.67;
-    const hullBottom = top + profileHeight * 0.80;
+    const hullTop = top + profileHeight * 0.63;
+    const hullBottom = top + profileHeight * 0.72;
     const mastX = x + width * 0.63;
-    const mastTop = top + profileHeight * 0.03;
+    const mastTop = top + profileHeight * 0.02;
     const mastBase = hullTop - 2;
-    const boomY = hullTop - profileHeight * 0.08;
+    const boomY = hullTop - profileHeight * 0.10;
     const mainClewX = x + width * 0.17;
     const mainClewY = boomY + profileHeight * 0.02;
     const boardX = x + width * 0.52;
     const boardTop = hullBottom - 2;
-    const boardMax = Math.max(24, profileHeight * 0.23);
-    const boardVisible = boardMax * amount;
-    const boardHalf = Math.max(3, width * 0.024);
+    const boardMax = Math.max(26, profileHeight * 0.22);
+    const boardHalf = Math.max(3.5, width * 0.018);
 
     ctx.save();
     ctx.font = "500 11px ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif";
@@ -1956,7 +1966,7 @@
 
     ctx.textAlign = "right";
     ctx.fillStyle = "rgba(24, 32, 29, 0.84)";
-    ctx.fillText(`~${depth}% down`, x + width, y + 9);
+    ctx.fillText(`Board: ${boardLabel}`, x + width, y + 9);
 
     ctx.strokeStyle = "rgba(79, 93, 86, 0.55)";
     ctx.lineWidth = 1.3;
@@ -2048,11 +2058,37 @@
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.moveTo(boardX - boardHalf, boardTop);
-    ctx.lineTo(boardX + boardHalf, boardTop);
-    ctx.lineTo(boardX + boardHalf * 0.60, boardTop + boardVisible);
-    ctx.quadraticCurveTo(boardX, boardTop + boardVisible + 5, boardX - boardHalf * 0.60, boardTop + boardVisible);
-    ctx.closePath();
+    if (rig.rigName === "twin") {
+      const pivot = { x: boardX + boardHalf * 1.2, y: boardTop + 1 };
+      const bladeLength = boardMax;
+      const bladeChord = Math.max(9, width * 0.040);
+      const downRange = clamp((depth - 30) / 62, 0, 1);
+      const boardAngle = (1 - downRange) * 82 * Math.PI / 180;
+      const rotateFromPivot = (dx, dy) => ({
+        x: pivot.x + dx * Math.cos(boardAngle) - dy * Math.sin(boardAngle),
+        y: pivot.y + dx * Math.sin(boardAngle) + dy * Math.cos(boardAngle)
+      });
+      const aftTop = rotateFromPivot(-bladeChord, 0);
+      const aftTip = rotateFromPivot(-bladeChord * 0.70, bladeLength);
+      const foreTip = rotateFromPivot(-bladeChord * 0.16, bladeLength + 5);
+      ctx.moveTo(pivot.x, pivot.y);
+      ctx.lineTo(aftTop.x, aftTop.y);
+      ctx.lineTo(aftTip.x, aftTip.y);
+      ctx.quadraticCurveTo(
+        (aftTip.x + foreTip.x) / 2,
+        Math.max(aftTip.y, foreTip.y) + 4,
+        foreTip.x,
+        foreTip.y
+      );
+      ctx.closePath();
+    } else {
+      const boardVisible = boardMax * amount;
+      ctx.moveTo(boardX - boardHalf, boardTop);
+      ctx.lineTo(boardX + boardHalf, boardTop);
+      ctx.lineTo(boardX + boardHalf * 0.60, boardTop + boardVisible);
+      ctx.quadraticCurveTo(boardX, boardTop + boardVisible + 5, boardX - boardHalf * 0.60, boardTop + boardVisible);
+      ctx.closePath();
+    }
     ctx.fillStyle = "rgba(8, 127, 122, 0.70)";
     ctx.strokeStyle = "rgba(8, 127, 122, 0.92)";
     ctx.lineWidth = 1.4;
