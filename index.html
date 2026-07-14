@@ -1489,8 +1489,6 @@
       );
     }
 
-    drawHeadingHandles(rig);
-
     ctx.beginPath();
     const mastScreen = toScreen(rig.mast);
     ctx.arc(mastScreen.x, mastScreen.y, 5, 0, TAU);
@@ -1514,34 +1512,6 @@
       bow: add(rig.center, scale(rig.f, rig.boatLength * 0.53)),
       stern: add(rig.center, scale(rig.f, -rig.boatLength * 0.54))
     };
-  }
-
-  function drawHeadingHandles(rig) {
-    if (!rig.isActive) return;
-    const handles = boatHandlePoints(rig);
-    const radius = clamp(headingHandleRadius(rig) * state.zoom, 13, 20);
-    const handleItems = [
-      { point: handles.bow, color: "#087f7a" },
-      { point: handles.stern, color: "#d86f34" }
-    ];
-
-    ctx.save();
-    ctx.lineWidth = 2;
-    for (const item of handleItems) {
-      const screen = toScreen(item.point);
-      ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
-      ctx.strokeStyle = item.color;
-      ctx.beginPath();
-      ctx.arc(screen.x, screen.y, radius, 0, TAU);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = item.color;
-      ctx.beginPath();
-      ctx.arc(screen.x, screen.y, Math.max(3.5, radius * 0.26), 0, TAU);
-      ctx.fill();
-    }
-    ctx.restore();
   }
 
   function drawSideLabel(text, anchorWorld, labelWorld, color) {
@@ -1740,29 +1710,6 @@
       }
     }
 
-    if (sail.boatIsActive) {
-      drawSailTrimHandle(sail);
-    }
-    ctx.restore();
-  }
-
-  function drawSailTrimHandle(sail) {
-    const clew = toScreen(sail.b);
-    const radius = sail.name === "main" ? 11 : 9;
-
-    ctx.save();
-    ctx.fillStyle = "rgba(255, 255, 255, 0.86)";
-    ctx.strokeStyle = sail.name === "main" ? "#087f7a" : "#6148b4";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(clew.x, clew.y, radius, 0, TAU);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = ctx.strokeStyle;
-    ctx.beginPath();
-    ctx.arc(clew.x, clew.y, Math.max(3, radius * 0.28), 0, TAU);
-    ctx.fill();
     ctx.restore();
   }
 
