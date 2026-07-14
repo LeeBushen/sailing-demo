@@ -1474,20 +1474,18 @@
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    if (rig.isActive) {
-      drawSideLabel(
-        "STARBOARD",
-        add(add(rig.center, scale(f, -L * 0.05)), scale(sb, beam * 0.53)),
-        add(add(rig.center, scale(f, -L * 0.05)), scale(sb, beam * 0.78)),
-        "#087f7a"
-      );
-      drawSideLabel(
-        "PORT",
-        add(add(rig.center, scale(f, -L * 0.05)), scale(sb, -beam * 0.53)),
-        add(add(rig.center, scale(f, -L * 0.05)), scale(sb, -beam * 0.78)),
-        "#d86f34"
-      );
-    }
+    drawSideLabel(
+      "STARBOARD",
+      add(add(rig.center, scale(f, -L * 0.05)), scale(sb, beam * 0.53)),
+      add(add(rig.center, scale(f, -L * 0.05)), scale(sb, beam * 0.78)),
+      "#087f7a"
+    );
+    drawSideLabel(
+      "PORT",
+      add(add(rig.center, scale(f, -L * 0.05)), scale(sb, -beam * 0.53)),
+      add(add(rig.center, scale(f, -L * 0.05)), scale(sb, -beam * 0.78)),
+      "#d86f34"
+    );
 
     ctx.beginPath();
     const mastScreen = toScreen(rig.mast);
