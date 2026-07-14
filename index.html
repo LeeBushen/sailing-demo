@@ -628,6 +628,8 @@
   }
 
   function recommendedDaggerboardDepth(absHeading) {
+    // Training guide: sailing sources agree on full board upwind and less board downwind;
+    // these percentages interpolate that guidance for a clear visual demo.
     const boardPoints = [
       [0, 100],
       [45, 100],
@@ -1891,9 +1893,9 @@
     if (!boats.length) return;
 
     const compact = state.width < 620;
-    const width = compact ? 176 : 232;
-    const rowHeight = compact ? 106 : 128;
     const margin = compact ? 10 : 18;
+    const width = Math.min(state.width - margin * 2, compact ? 260 : 420);
+    const rowHeight = compact ? 132 : 170;
     const x = Math.max(margin, state.width - width - margin);
     const y = compact ? 88 : 92;
     const height = 30 + boats.length * rowHeight + 10;
@@ -1912,7 +1914,7 @@
     ctx.fillStyle = "rgba(79, 93, 86, 0.76)";
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText("BOARD DEPTH", x + 12, y + 16);
+    ctx.fillText("BOARD DEPTH GUIDE", x + 12, y + 16);
 
     boats.forEach((boat, index) => {
       drawDaggerboardProfile(boat, x + 10, y + 30 + index * rowHeight, width - 20, rowHeight - 8);
@@ -1954,7 +1956,7 @@
 
     ctx.textAlign = "right";
     ctx.fillStyle = "rgba(24, 32, 29, 0.84)";
-    ctx.fillText(`${depth}% down`, x + width, y + 9);
+    ctx.fillText(`~${depth}% down`, x + width, y + 9);
 
     ctx.strokeStyle = "rgba(79, 93, 86, 0.55)";
     ctx.lineWidth = 1.3;
