@@ -1910,7 +1910,8 @@
     const width = Math.min(state.width - margin * 2, compact ? 270 : 340);
     const x = Math.max(margin, state.width - width - margin);
     const y = compact ? 88 : 92;
-    const availableHeight = Math.max(compact ? 440 : 540, state.height - y - margin);
+    const fullGuideHeight = Math.max(compact ? 440 : 540, state.height - y - margin);
+    const availableHeight = Math.max(compact ? 230 : 285, Math.floor(fullGuideHeight * 0.5));
     const rowHeight = Math.floor((availableHeight - 40) / boats.length);
     const height = 30 + boats.length * rowHeight + 10;
 
