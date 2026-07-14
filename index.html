@@ -1095,16 +1095,17 @@
   function drawPressure(rig) {
     if (!state.pressure) return;
     ctx.save();
-    ctx.globalCompositeOperation = "multiply";
+    ctx.globalCompositeOperation = "source-over";
     for (const sail of rig.sails) {
       const lift = Math.min(1, Math.abs(sail.liftCoefficient) / 2.8) * attachedFlowFactor(sail);
       const liftSign = Math.sign(sail.alpha || 1);
       const lowA = toScreen(add(add(sail.a, scale(sail.tangent, sail.chord * 0.44)), scale(sail.normal, sail.chord * 0.12 * liftSign)));
       const highA = toScreen(add(add(sail.a, scale(sail.tangent, sail.chord * 0.38)), scale(sail.normal, -sail.chord * 0.12 * liftSign)));
-      const radius = sail.chord * state.zoom * 0.44;
+      const radius = sail.chord * state.zoom * 0.52;
 
       let g = ctx.createRadialGradient(lowA.x, lowA.y, 2, lowA.x, lowA.y, radius);
-      g.addColorStop(0, `rgba(67, 119, 196, ${0.24 * lift})`);
+      g.addColorStop(0, `rgba(67, 119, 196, ${0.44 * lift})`);
+      g.addColorStop(0.46, `rgba(67, 119, 196, ${0.20 * lift})`);
       g.addColorStop(1, "rgba(67, 119, 196, 0)");
       ctx.fillStyle = g;
       ctx.beginPath();
@@ -1112,7 +1113,8 @@
       ctx.fill();
 
       g = ctx.createRadialGradient(highA.x, highA.y, 2, highA.x, highA.y, radius * 0.82);
-      g.addColorStop(0, `rgba(216, 111, 52, ${0.22 * lift})`);
+      g.addColorStop(0, `rgba(216, 111, 52, ${0.40 * lift})`);
+      g.addColorStop(0.46, `rgba(216, 111, 52, ${0.18 * lift})`);
       g.addColorStop(1, "rgba(216, 111, 52, 0)");
       ctx.fillStyle = g;
       ctx.beginPath();
