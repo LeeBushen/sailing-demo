@@ -498,6 +498,7 @@
     particles: [],
     drag: null,
     lastHeadingDragDeg: null,
+    lastSailDragValue: null,
     lastTime: performance.now(),
     reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches
   };
@@ -741,6 +742,11 @@
       sails.push(makeSail("jib", tack, add(tack, scale(jibDir, jibChord)), jibSheetSide, boatLength, downwind, absHeading, boat));
     }
 
+    for (const sail of sails) {
+      sail.boatIndex = boatIndex;
+      sail.boatIsActive = boatIndex === state.activeBoat;
+    }
+
     const tack = noGo
       ? "Head to wind"
       : absHeading >= 150
@@ -821,6 +827,7 @@
       chord,
       tangent,
       normal,
+      sheetSide: lee,
       alpha,
       rawAlpha,
       luff,
@@ -1732,6 +1739,30 @@
         ctx.fill();
       }
     }
+
+    if (sail.boatIsActive) {
+      drawSailTrimHandle(sail);
+    }
+    ctx.restore();
+  }
+
+  function drawSailTrimHandle(sail) {
+    const clew = toScreen(sail.b);
+    const radius = sail.name === "main" ? 11 : 9;
+
+    ctx.save();
+    ctx.fillStyle = "rgba(255, 255, 255, 0.86)";
+    ctx.strokeStyle = sail.name === "main" ? "#087f7a" : "#6148b4";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(clew.x, clew.y, radius, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = ctx.strokeStyle;
+    ctx.beginPath();
+    ctx.arc(clew.x, clew.y, Math.max(3, radius * 0.28), 0, TAU);
+    ctx.fill();
     ctx.restore();
   }
 
@@ -1944,6 +1975,44 @@
     return hx > -rig.boatLength * 0.66 && hx < rig.boatLength * 0.62 && ellipse < 1.18;
   }
 
+  function distanceToSegment(p, a, b) {
+    const ab = sub(b, a);
+    const abLen2 = dot(ab, ab) || 1;
+    const t = clamp(dot(sub(p, a), ab) / abLen2, 0, 1);
+    const nearest = add(a, scale(ab, t));
+    return length(sub(p, nearest));
+  }
+
+  function sailDistanceToPoint(sail, p) {
+    let previous = sailSurfacePoint(sail, 0, 0);
+    let closest = length(sub(p, sail.b));
+    for (let i = 1; i <= 26; i += 1) {
+      const next = sailSurfacePoint(sail, i / 26, 0);
+      closest = Math.min(closest, distanceToSegment(p, previous, next));
+      previous = next;
+    }
+    return closest;
+  }
+
+  function findSailHitAtPoint(p) {
+    const scene = buildScene();
+    for (let i = scene.boats.length - 1; i >= 0; i -= 1) {
+      const rig = scene.boats[i];
+      for (let j = rig.sails.length - 1; j >= 0; j -= 1) {
+        const sail = rig.sails[j];
+        const hitRadius = Math.max(22 / state.zoom, sail.chord * 0.055);
+        if (sailDistanceToPoint(sail, p) <= hitRadius) {
+          return {
+            rig,
+            mode: "sail",
+            sailName: sail.name
+          };
+        }
+      }
+    }
+    return null;
+  }
+
   function headingDragEndForPoint(rig, p) {
     const rel = sub(p, rig.center);
     const hx = dot(rel, rig.f);
@@ -1961,6 +2030,10 @@
       return "stern";
     }
     return null;
+  }
+
+  function findCanvasHitAtPoint(p) {
+    return findSailHitAtPoint(p) || findBoatHitAtPoint(p);
   }
 
   function findBoatHitAtPoint(p) {
@@ -2006,16 +2079,50 @@
     }
   }
 
+  function updateSailTrimFromPointer(drag, p) {
+    const boat = state.boats[drag.boatIndex];
+    const boatCount = state.secondBoat ? 2 : 1;
+    const displayIndex = state.secondBoat ? drag.boatIndex : 0;
+    const rig = buildRig(boat, drag.boatIndex, displayIndex, boatCount);
+    const sail = rig.sails.find((item) => item.name === drag.sailName);
+    if (!sail) return;
+
+    const pull = sub(p, sail.a);
+    if (length(pull) < 14 / state.zoom) return;
+
+    const trimRad = Math.atan2(dot(pull, sail.sheetSide), dot(pull, rig.aft));
+    const maxTrim = sail.name === "main" ? 95 : 100;
+    const nextTrim = clamp(Math.round(trimRad * 180 / Math.PI), 5, maxTrim);
+    const key = sail.name === "main" ? "mainDeg" : "jibDeg";
+    if (Math.abs(nextTrim - boat[key]) < 0.5) return;
+
+    boat[key] = nextTrim;
+    syncInputsFromActiveBoat();
+    updateControls();
+
+    if (state.lastSailDragValue === null || Math.abs(nextTrim - state.lastSailDragValue) >= 2) {
+      paintBackground();
+      state.lastSailDragValue = nextTrim;
+    }
+  }
+
   function handlePointerDown(event) {
     if (event.button !== undefined && event.button !== 0) return;
     const p = eventWorldPoint(event);
-    const hit = findBoatHitAtPoint(p);
+    const hit = findCanvasHitAtPoint(p);
     if (!hit) return;
 
     event.preventDefault();
     selectBoat(hit.rig.boatIndex);
     const boat = state.boats[hit.rig.boatIndex];
-    state.drag = hit.mode === "heading"
+    state.drag = hit.mode === "sail"
+      ? {
+        type: "sail",
+        pointerId: event.pointerId,
+        boatIndex: hit.rig.boatIndex,
+        sailName: hit.sailName
+      }
+      : hit.mode === "heading"
       ? {
         type: "heading",
         pointerId: event.pointerId,
@@ -2029,7 +2136,11 @@
         offsetX: boat.x - p.x,
         offsetY: boat.y - p.y
       };
-    if (state.drag.type === "heading") {
+    if (state.drag.type === "sail") {
+      const key = state.drag.sailName === "main" ? "mainDeg" : "jibDeg";
+      state.lastSailDragValue = boat[key];
+      updateSailTrimFromPointer(state.drag, p);
+    } else if (state.drag.type === "heading") {
       state.lastHeadingDragDeg = boat.headingDeg;
       updateHeadingFromPointer(state.drag, p);
     }
@@ -2043,6 +2154,8 @@
       event.preventDefault();
       if (state.drag.type === "heading") {
         updateHeadingFromPointer(state.drag, p);
+      } else if (state.drag.type === "sail") {
+        updateSailTrimFromPointer(state.drag, p);
       } else {
         const boat = state.boats[state.drag.boatIndex];
         boat.x = p.x + state.drag.offsetX;
@@ -2052,7 +2165,7 @@
       return;
     }
 
-    const hit = findBoatHitAtPoint(p);
+    const hit = findCanvasHitAtPoint(p);
     canvas.style.cursor = hit ? "grab" : "zoom-in";
   }
 
@@ -2063,6 +2176,7 @@
     }
     state.drag = null;
     state.lastHeadingDragDeg = null;
+    state.lastSailDragValue = null;
     canvas.style.cursor = "grab";
   }
 
