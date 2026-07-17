@@ -275,14 +275,11 @@
       .legend {
         position: absolute;
         left: 18px;
-        top: 84px;
-        bottom: auto;
+        bottom: 18px;
         display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 7px;
-        width: max-content;
-        max-width: 210px;
+        flex-wrap: wrap;
+        gap: 8px;
+        max-width: calc(100% - 36px);
         background: rgba(255, 255, 255, 0.76);
         border: 1px solid rgba(207, 217, 209, 0.9);
         border-radius: 8px;
@@ -365,10 +362,8 @@
 
         .legend {
           left: 10px;
-          right: auto;
-          top: 76px;
-          bottom: auto;
-          max-width: calc(100% - 20px);
+          right: 10px;
+          bottom: 10px;
         }
       }
     </style>
@@ -399,11 +394,6 @@
           <span class="control-title">Heading to wind <span class="value" id="heading-value"></span></span>
           <input id="heading" type="range" min="-180" max="180" value="45" step="1" aria-label="Boat heading relative to the wind">
         </label>
-
-        <div class="control-group">
-          <div class="control-title">Sail trim mode</div>
-          <button type="button" class="icon-button" id="auto-trim-toggle" aria-pressed="true">Auto-adjust sails</button>
-        </div>
 
         <label class="control-group">
           <span class="control-title">Mainsail boom <span class="value" id="main-value"></span></span>
@@ -480,7 +470,6 @@
   const headingInput = root.querySelector("#heading");
   const mainInput = root.querySelector("#main-trim");
   const jibInput = root.querySelector("#jib-trim");
-  const autoTrimToggle = root.querySelector("#auto-trim-toggle");
   const pressureToggle = root.querySelector("#pressure-toggle");
   const vectorsToggle = root.querySelector("#vectors-toggle");
   const eddiesToggle = root.querySelector("#eddies-toggle");
@@ -537,7 +526,6 @@
     vectors: true,
     eddies: true,
     centreboardGuide: false,
-    autoTrim: true,
     dpr: 1,
     width: 0,
     height: 0,
@@ -746,14 +734,12 @@
   }
 
   function setRecommendedTrimForHeading() {
-    if (!state.autoTrim) return;
     const absHeading = Math.abs(Number(headingInput.value));
     mainInput.value = recommendedTrim(absHeading, "main");
     jibInput.value = recommendedTrim(absHeading, "jib");
   }
 
   function setRecommendedTrimForBoat(boat) {
-    if (!state.autoTrim) return;
     const absHeading = Math.abs(boat.headingDeg);
     boat.mainDeg = recommendedTrim(absHeading, "main");
     boat.jibDeg = recommendedTrim(absHeading, "jib");
@@ -777,7 +763,6 @@
     boatTwoToggle.textContent = state.secondBoat ? "Remove second boat" : "Add second boat";
     rigSingle.setAttribute("aria-pressed", String(boat.rig === "single"));
     rigTwin.setAttribute("aria-pressed", String(boat.rig === "twin"));
-    autoTrimToggle.setAttribute("aria-pressed", String(state.autoTrim));
     jibInput.disabled = boat.rig === "single";
     jibWrap.style.opacity = boat.rig === "single" ? "0.45" : "1";
     pressureToggle.setAttribute("aria-pressed", String(state.pressure));
@@ -2258,15 +2243,15 @@
 
   function tillerRudderHitAtPoint(rig, p) {
     const geometry = tillerRudderGeometry(rig);
-    const hitRadius = Math.max(30 / state.zoom, rig.boatLength * 0.058);
+    const hitRadius = Math.max(18 / state.zoom, rig.boatLength * 0.044);
     return distanceToSegment(p, geometry.aftTip, geometry.forwardTip) <= hitRadius;
   }
 
   function sailDistanceToPoint(sail, p) {
-    let previous = sailSurfacePoint(sail, 0, 0);
-    let closest = Math.min(length(sub(p, sail.a)), length(sub(p, sail.b)));
-    for (let i = 1; i <= 24; i += 1) {
-      const next = sailSurfacePoint(sail, i / 24, 0);
+    let previous = sailSurfacePoint(sail, 0.75, 0);
+    let closest = length(sub(p, sail.b));
+    for (let i = 1; i <= 10; i += 1) {
+      const next = sailSurfacePoint(sail, 0.75 + i * 0.25 / 10, 0);
       closest = Math.min(closest, distanceToSegment(p, previous, next));
       previous = next;
     }
@@ -2279,7 +2264,7 @@
       const rig = scene.boats[i];
       for (let j = rig.sails.length - 1; j >= 0; j -= 1) {
         const sail = rig.sails[j];
-        const hitRadius = Math.max(24 / state.zoom, sail.chord * 0.064);
+        const hitRadius = Math.max(22 / state.zoom, sail.chord * 0.055);
         if (sailDistanceToPoint(sail, p) <= hitRadius) {
           return {
             rig,
@@ -2552,19 +2537,6 @@
   centreboardToggle.addEventListener("click", () => {
     state.centreboardGuide = !state.centreboardGuide;
     updateControls();
-    paintBackground();
-  });
-
-  autoTrimToggle.addEventListener("click", () => {
-    state.autoTrim = !state.autoTrim;
-    if (state.autoTrim) {
-      const visibleBoatCount = state.secondBoat ? 2 : 1;
-      for (let i = 0; i < visibleBoatCount; i += 1) {
-        setRecommendedTrimForBoat(state.boats[i]);
-      }
-      syncInputsFromActiveBoat();
-    }
-    refreshControlDisplay();
     paintBackground();
   });
 
