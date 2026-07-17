@@ -2258,10 +2258,10 @@
   }
 
   function sailDistanceToPoint(sail, p) {
-    let previous = sailSurfacePoint(sail, 0.75, 0);
-    let closest = length(sub(p, sail.b));
-    for (let i = 1; i <= 10; i += 1) {
-      const next = sailSurfacePoint(sail, 0.75 + i * 0.25 / 10, 0);
+    let previous = sailSurfacePoint(sail, 0, 0);
+    let closest = Math.min(length(sub(p, sail.a)), length(sub(p, sail.b)));
+    for (let i = 1; i <= 24; i += 1) {
+      const next = sailSurfacePoint(sail, i / 24, 0);
       closest = Math.min(closest, distanceToSegment(p, previous, next));
       previous = next;
     }
@@ -2274,7 +2274,7 @@
       const rig = scene.boats[i];
       for (let j = rig.sails.length - 1; j >= 0; j -= 1) {
         const sail = rig.sails[j];
-        const hitRadius = Math.max(22 / state.zoom, sail.chord * 0.055);
+        const hitRadius = Math.max(24 / state.zoom, sail.chord * 0.064);
         if (sailDistanceToPoint(sail, p) <= hitRadius) {
           return {
             rig,
