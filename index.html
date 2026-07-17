@@ -395,6 +395,11 @@
           <input id="heading" type="range" min="-180" max="180" value="45" step="1" aria-label="Boat heading relative to the wind">
         </label>
 
+        <div class="control-group">
+          <div class="control-title">Sail trim mode</div>
+          <button type="button" class="icon-button" id="auto-trim-toggle" aria-pressed="true">Auto-adjust sails</button>
+        </div>
+
         <label class="control-group">
           <span class="control-title">Mainsail boom <span class="value" id="main-value"></span></span>
           <input id="main-trim" type="range" min="5" max="95" value="18" step="1" aria-label="Mainsail boom angle">
@@ -470,6 +475,7 @@
   const headingInput = root.querySelector("#heading");
   const mainInput = root.querySelector("#main-trim");
   const jibInput = root.querySelector("#jib-trim");
+  const autoTrimToggle = root.querySelector("#auto-trim-toggle");
   const pressureToggle = root.querySelector("#pressure-toggle");
   const vectorsToggle = root.querySelector("#vectors-toggle");
   const eddiesToggle = root.querySelector("#eddies-toggle");
@@ -526,6 +532,7 @@
     vectors: true,
     eddies: true,
     centreboardGuide: false,
+    autoTrim: true,
     dpr: 1,
     width: 0,
     height: 0,
@@ -734,12 +741,14 @@
   }
 
   function setRecommendedTrimForHeading() {
+    if (!state.autoTrim) return;
     const absHeading = Math.abs(Number(headingInput.value));
     mainInput.value = recommendedTrim(absHeading, "main");
     jibInput.value = recommendedTrim(absHeading, "jib");
   }
 
   function setRecommendedTrimForBoat(boat) {
+    if (!state.autoTrim) return;
     const absHeading = Math.abs(boat.headingDeg);
     boat.mainDeg = recommendedTrim(absHeading, "main");
     boat.jibDeg = recommendedTrim(absHeading, "jib");
@@ -763,6 +772,7 @@
     boatTwoToggle.textContent = state.secondBoat ? "Remove second boat" : "Add second boat";
     rigSingle.setAttribute("aria-pressed", String(boat.rig === "single"));
     rigTwin.setAttribute("aria-pressed", String(boat.rig === "twin"));
+    autoTrimToggle.setAttribute("aria-pressed", String(state.autoTrim));
     jibInput.disabled = boat.rig === "single";
     jibWrap.style.opacity = boat.rig === "single" ? "0.45" : "1";
     pressureToggle.setAttribute("aria-pressed", String(state.pressure));
@@ -2537,6 +2547,19 @@
   centreboardToggle.addEventListener("click", () => {
     state.centreboardGuide = !state.centreboardGuide;
     updateControls();
+    paintBackground();
+  });
+
+  autoTrimToggle.addEventListener("click", () => {
+    state.autoTrim = !state.autoTrim;
+    if (state.autoTrim) {
+      const visibleBoatCount = state.secondBoat ? 2 : 1;
+      for (let i = 0; i < visibleBoatCount; i += 1) {
+        setRecommendedTrimForBoat(state.boats[i]);
+      }
+      syncInputsFromActiveBoat();
+    }
+    refreshControlDisplay();
     paintBackground();
   });
 
