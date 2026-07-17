@@ -2258,7 +2258,7 @@
 
   function tillerRudderHitAtPoint(rig, p) {
     const geometry = tillerRudderGeometry(rig);
-    const hitRadius = Math.max(18 / state.zoom, rig.boatLength * 0.044);
+    const hitRadius = Math.max(30 / state.zoom, rig.boatLength * 0.058);
     return distanceToSegment(p, geometry.aftTip, geometry.forwardTip) <= hitRadius;
   }
 
