@@ -1147,6 +1147,10 @@
     v.y += dx * factor;
   }
 
+  function airflowAt(p, rig) {
+    return flowAt(p, { sails: rig.sails || [], boats: [] });
+  }
+
   function resetParticle(p, randomY) {
     const bounds = viewBounds();
     const margin = 36 / state.zoom;
@@ -1349,7 +1353,7 @@
         y: lerp(segment.a.y, segment.b.y, t)
       };
       const dir = normalize(sub(segment.b, segment.a));
-      const localSpeed = length(flowAt(p, rig));
+      const localSpeed = length(airflowAt(p, rig));
       const style = styleForPoint(p, dir, localSpeed);
       drawFlowArrow(p, dir, style.size, style.color, style.width);
     }
@@ -1368,8 +1372,8 @@
       const points = traceFlowLine(seed, rig, bounds);
       if (points.length < 4) continue;
 
-      drawFlowTrace(points, "rgba(8, 127, 122, 0.16)", 1.05, rig, true);
-      drawAnimatedFlowArrows(points, now, lane * 23, arrowSpacing, rig, true, (_p, _dir, localSpeed) => {
+      drawFlowTrace(points, "rgba(8, 127, 122, 0.16)", 1.05, rig, false);
+      drawAnimatedFlowArrows(points, now, lane * 23, arrowSpacing, rig, false, (_p, _dir, localSpeed) => {
         const warm = clamp((localSpeed - 78) / 70, 0, 1);
         const alpha = clamp(0.34 + localSpeed / 260, 0.34, 0.82);
         const color = `rgba(${Math.round(8 + warm * 208)}, ${Math.round(127 - warm * 16)}, ${Math.round(122 - warm * 70)}, ${alpha})`;
@@ -1395,13 +1399,13 @@
         break;
       }
       points.push({ x: p.x, y: p.y });
-      const v1 = flowAt(p, rig);
+      const v1 = airflowAt(p, rig);
       const dt = step / Math.max(24, length(v1));
       const mid = {
         x: p.x + v1.x * dt * 0.5,
         y: p.y + v1.y * dt * 0.5
       };
-      const v2 = flowAt(mid, rig);
+      const v2 = airflowAt(mid, rig);
       p = {
         x: p.x + v2.x * dt,
         y: p.y + v2.y * dt
@@ -1518,25 +1522,15 @@
     for (const p of state.particles) {
       p.px = p.x;
       p.py = p.y;
-      if (flowMaskedByHull(p, rig)) {
-        resetParticle(p, false);
-        continue;
-      }
-
-      const v1 = flowAt(p, rig);
+      const v1 = airflowAt(p, rig);
       const mid = {
         x: p.x + v1.x * dt * 0.5,
         y: p.y + v1.y * dt * 0.5
       };
-      const v2 = flowAt(mid, rig);
+      const v2 = airflowAt(mid, rig);
       p.x += v2.x * dt;
       p.y += v2.y * dt;
       p.age += dt * 60;
-
-      if (flowMaskedByHull(p, rig)) {
-        resetParticle(p, false);
-        continue;
-      }
 
       const speed = length(v2);
       const alpha = clamp(0.18 + speed / 420, 0.18, 0.56);
@@ -2375,16 +2369,16 @@
     for (const boat of scene.boats) {
       drawNoGoZone(boat);
     }
-    drawDriveGauge(performance, activeRig);
     drawPressure(scene);
     drawEddyGuides(scene, now);
-    drawVectors(scene, now);
-    drawParticles(scene, dt);
     for (const boat of scene.boats) {
       drawBoat(boat, now);
     }
+    drawVectors(scene, now);
+    drawParticles(scene, dt);
     drawSailSurfaceFlow(scene, now);
     drawTelltales(scene, now);
+    drawDriveGauge(performance, activeRig);
     drawDaggerboardProfiles(scene);
     updateMetrics(activeRig, performance);
 
