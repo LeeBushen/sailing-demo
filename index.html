@@ -1288,6 +1288,73 @@
     ctx.restore();
   }
 
+  function flowMaskedByHull(p, rig) {
+    const hulls = rig.boats || [rig];
+    return hulls.some((hull) => {
+      const rel = sub(p, hull.center);
+      const hx = dot(rel, hull.f);
+      const hy = dot(rel, hull.starboard);
+      const lengthRadius = hull.boatLength * 0.57;
+      const beamRadius = hull.beam * 0.78;
+      const ellipse = Math.pow(hx / lengthRadius, 2) + Math.pow(hy / beamRadius, 2);
+      return hx > -hull.boatLength * 0.58 && hx < hull.boatLength * 0.62 && ellipse < 1.04;
+    });
+  }
+
+  function drawFlowTrace(points, color, width, rig, maskHulls) {
+    ctx.beginPath();
+    let drawing = false;
+    let hasStroke = false;
+    for (const point of points) {
+      if (maskHulls && flowMaskedByHull(point, rig)) {
+        drawing = false;
+        continue;
+      }
+      const s = toScreen(point);
+      if (!drawing) {
+        ctx.moveTo(s.x, s.y);
+        drawing = true;
+      } else {
+        ctx.lineTo(s.x, s.y);
+      }
+      hasStroke = true;
+    }
+    if (!hasStroke) return;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.stroke();
+  }
+
+  function drawAnimatedFlowArrows(points, now, phaseOffset, arrowSpacing, rig, maskHulls, styleForPoint) {
+    let total = 0;
+    const segments = [];
+    for (let i = 1; i < points.length; i += 1) {
+      const a = points[i - 1];
+      const b = points[i];
+      if (maskHulls && (flowMaskedByHull(a, rig) || flowMaskedByHull(b, rig))) continue;
+      const segmentLength = length(sub(b, a));
+      if (segmentLength < 1) continue;
+      total += segmentLength;
+      segments.push({ a, b, start: total - segmentLength, length: segmentLength });
+    }
+
+    if (!segments.length) return;
+    const travel = (now * 0.105 + phaseOffset) % arrowSpacing;
+    for (let d = travel; d < total; d += arrowSpacing) {
+      const segment = segments.find((entry) => d >= entry.start && d <= entry.start + entry.length);
+      if (!segment) continue;
+      const t = (d - segment.start) / segment.length;
+      const p = {
+        x: lerp(segment.a.x, segment.b.x, t),
+        y: lerp(segment.a.y, segment.b.y, t)
+      };
+      const dir = normalize(sub(segment.b, segment.a));
+      const localSpeed = length(flowAt(p, rig));
+      const style = styleForPoint(p, dir, localSpeed);
+      drawFlowArrow(p, dir, style.size, style.color, style.width);
+    }
+  }
+
   function drawVectors(rig, now) {
     if (!state.vectors) return;
     const spacing = state.width < 580 ? 46 : 58;
@@ -1301,42 +1368,13 @@
       const points = traceFlowLine(seed, rig, bounds);
       if (points.length < 4) continue;
 
-      ctx.beginPath();
-      for (let i = 0; i < points.length; i += 1) {
-        const s = toScreen(points[i]);
-        if (i === 0) ctx.moveTo(s.x, s.y);
-        else ctx.lineTo(s.x, s.y);
-      }
-      ctx.strokeStyle = "rgba(8, 127, 122, 0.18)";
-      ctx.lineWidth = 1.2;
-      ctx.stroke();
-
-      let total = 0;
-      const segments = [];
-      for (let i = 1; i < points.length; i += 1) {
-        const a = points[i - 1];
-        const b = points[i];
-        const segmentLength = length(sub(b, a));
-        total += segmentLength;
-        segments.push({ a, b, start: total - segmentLength, length: segmentLength });
-      }
-
-      const travel = (now * 0.105 + lane * 23) % arrowSpacing;
-      for (let d = travel; d < total; d += arrowSpacing) {
-        const segment = segments.find((entry) => d >= entry.start && d <= entry.start + entry.length);
-        if (!segment || segment.length < 1) continue;
-        const t = (d - segment.start) / segment.length;
-        const p = {
-          x: lerp(segment.a.x, segment.b.x, t),
-          y: lerp(segment.a.y, segment.b.y, t)
-        };
-        const dir = normalize(sub(segment.b, segment.a));
-        const localSpeed = length(flowAt(p, rig));
+      drawFlowTrace(points, "rgba(8, 127, 122, 0.16)", 1.05, rig, true);
+      drawAnimatedFlowArrows(points, now, lane * 23, arrowSpacing, rig, true, (_p, _dir, localSpeed) => {
         const warm = clamp((localSpeed - 78) / 70, 0, 1);
         const alpha = clamp(0.34 + localSpeed / 260, 0.34, 0.82);
         const color = `rgba(${Math.round(8 + warm * 208)}, ${Math.round(127 - warm * 16)}, ${Math.round(122 - warm * 70)}, ${alpha})`;
-        drawFlowArrow(p, dir, 22 + warm * 7, color, 1.6 + warm * 0.7);
-      }
+        return { size: 22 + warm * 7, color, width: 1.6 + warm * 0.7 };
+      });
     }
     ctx.restore();
   }
@@ -1471,6 +1509,7 @@
   }
 
   function drawParticles(rig, dt) {
+    if (!state.vectors) return;
     const bounds = viewBounds();
     const margin = 80 / state.zoom;
     ctx.save();
@@ -1479,6 +1518,11 @@
     for (const p of state.particles) {
       p.px = p.x;
       p.py = p.y;
+      if (flowMaskedByHull(p, rig)) {
+        resetParticle(p, false);
+        continue;
+      }
+
       const v1 = flowAt(p, rig);
       const mid = {
         x: p.x + v1.x * dt * 0.5,
@@ -1488,6 +1532,11 @@
       p.x += v2.x * dt;
       p.y += v2.y * dt;
       p.age += dt * 60;
+
+      if (flowMaskedByHull(p, rig)) {
+        resetParticle(p, false);
+        continue;
+      }
 
       const speed = length(v2);
       const alpha = clamp(0.18 + speed / 420, 0.18, 0.56);
@@ -1750,11 +1799,76 @@
     ctx.restore();
   }
 
+  function cubicPoint(p0, p1, p2, p3, t) {
+    const u = 1 - t;
+    const uu = u * u;
+    const tt = t * t;
+    return {
+      x: p0.x * uu * u + p1.x * 3 * uu * t + p2.x * 3 * u * tt + p3.x * tt * t,
+      y: p0.y * uu * u + p1.y * 3 * uu * t + p2.y * 3 * u * tt + p3.y * tt * t
+    };
+  }
+
+  function drawSlotFlowForBoat(boat, now) {
+    if (boat.rigName !== "twin") return;
+    const main = boat.sails.find((sail) => sail.name === "main");
+    const jib = boat.sails.find((sail) => sail.name === "jib");
+    if (!main || !jib) return;
+
+    const slotVector = sub(jib.b, boat.mast);
+    const slotWidth = length(slotVector);
+    if (slotWidth < boat.boatLength * 0.035) return;
+
+    const slotAcross = normalize(slotVector);
+    const mainLiftSide = scale(main.normal, Math.sign(main.alpha || 1));
+    const exitDir = normalize(add(scale(main.tangent, 0.88), scale(mainLiftSide, 0.34)));
+    const throatBase = add(boat.mast, scale(slotAcross, slotWidth * 0.52));
+    const lanes = state.width < 560 ? 2 : 3;
+
+    for (let lane = 0; lane < lanes; lane += 1) {
+      const laneCenter = lanes === 1 ? 0 : lane - (lanes - 1) / 2;
+      const laneOffset = laneCenter * Math.min(slotWidth * 0.22, boat.boatLength * 0.030);
+      const throat = add(throatBase, scale(slotAcross, laneOffset));
+      const entry = add(
+        add(throat, scale(WIND, -boat.boatLength * (0.58 + lane * 0.025))),
+        scale(slotAcross, laneOffset * 0.20)
+      );
+      const pullThrough = add(throat, scale(WIND, -boat.boatLength * 0.20));
+      const turnOntoMain = add(
+        add(throat, scale(main.tangent, main.chord * 0.25)),
+        scale(mainLiftSide, main.chord * (0.10 + lane * 0.012))
+      );
+      const exit = add(
+        add(main.a, scale(main.tangent, main.chord * (0.68 + lane * 0.07))),
+        scale(mainLiftSide, main.chord * (0.16 + lane * 0.012))
+      );
+      const downstream = add(exit, scale(exitDir, boat.boatLength * 0.30));
+
+      const points = [];
+      for (let i = 0; i <= 34; i += 1) {
+        points.push(cubicPoint(entry, pullThrough, turnOntoMain, downstream, i / 34));
+      }
+
+      drawFlowTrace(points, "rgba(8, 127, 122, 0.54)", 2.25, boat, false);
+      drawAnimatedFlowArrows(points, now, 38 + lane * 29, state.width < 560 ? 58 : 68, boat, false, (_p, _dir, localSpeed) => {
+        const warm = clamp((localSpeed - 76) / 72, 0, 1);
+        const alpha = clamp(0.64 + warm * 0.24, 0.64, 0.88);
+        const color = `rgba(${Math.round(8 + warm * 96)}, ${Math.round(127 - warm * 10)}, ${Math.round(122 - warm * 28)}, ${alpha})`;
+        return { size: 24 + warm * 5, color, width: 2.15 + warm * 0.45 };
+      });
+    }
+  }
+
   function drawSailSurfaceFlow(rig, now) {
     if (!state.vectors) return;
     ctx.save();
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
+    const boats = rig.boats || [rig];
+    for (const boat of boats) {
+      drawSlotFlowForBoat(boat, now);
+    }
+
     for (const sail of rig.sails) {
       const liftSign = Math.sign(sail.alpha || 1);
       const flowSides = [
