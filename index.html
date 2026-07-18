@@ -1794,7 +1794,7 @@
   }
 
   function sailCamberSide(sail) {
-    if (sail.name === "jib" && sail.downwind > 0.72) {
+    if (sail.downwind > 0.72) {
       return dot(WIND, sail.normal) >= 0 ? 1 : -1;
     }
     return 1;
