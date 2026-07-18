@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 56" role="img" aria-labelledby="title">
+  <title>Papercourt Sailing Club flag mark</title>
+  <rect width="120" height="56" rx="0" fill="#2863ad"/>
+  <g fill="none" stroke="#fff" stroke-linecap="square" stroke-linejoin="miter" stroke-width="3">
+    <path d="M43 12v32"/>
+    <path d="M43 13l40 15-40 15z"/>
+  </g>
+  <path d="M53 22l14 6-14 6z" fill="#fff"/>
+</svg>
