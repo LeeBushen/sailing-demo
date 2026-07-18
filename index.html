@@ -510,6 +510,7 @@
         tillerTargetDeg: 0,
         helmEffectDeg: 0,
         turnVelocity: 0,
+        mainSide: 1,
         x: 0,
         y: 0
       },
@@ -523,6 +524,7 @@
         tillerTargetDeg: 0,
         helmEffectDeg: 0,
         turnVelocity: 0,
+        mainSide: -1,
         x: 270,
         y: 0
       }
@@ -756,6 +758,19 @@
     return value > 0 ? "starboard" : "port";
   }
 
+  function tackSignForHeading(headingDeg, starboardVector = null) {
+    let starboard = starboardVector;
+    if (!starboard) {
+      const heading = headingDeg * Math.PI / 180;
+      const f = { x: Math.sin(heading), y: Math.cos(heading) };
+      starboard = { x: f.y, y: -f.x };
+    }
+    const windToStarboard = dot(WIND, starboard);
+    return Math.abs(windToStarboard) < 0.015
+      ? (headingDeg >= 0 ? 1 : -1)
+      : Math.sign(windToStarboard);
+  }
+
   function refreshControlDisplay() {
     const boat = activeBoat();
     headingValue.textContent = `${Math.round(Math.abs(boat.headingDeg))} deg ${signedSideLabel(boat.headingDeg)}`;
@@ -821,6 +836,28 @@
     }
   }
 
+  function updateMainsailGybeDynamics(dt) {
+    const visibleBoatCount = state.secondBoat ? 2 : 1;
+    for (let i = 0; i < visibleBoatCount; i += 1) {
+      const boat = state.boats[i];
+      const targetSide = tackSignForHeading(boat.headingDeg);
+      if (!Number.isFinite(boat.mainSide)) {
+        boat.mainSide = targetSide;
+        continue;
+      }
+
+      const absHeading = Math.abs(boat.headingDeg);
+      const downwindWeight = smoothstep(128, 158, absHeading);
+      const response = lerp(14, 4.2, downwindWeight);
+      const ease = 1 - Math.exp(-dt * response);
+      boat.mainSide += (targetSide - boat.mainSide) * ease;
+
+      if (Math.abs(boat.mainSide - targetSide) < 0.012) {
+        boat.mainSide = targetSide;
+      }
+    }
+  }
+
   function buildRig(boat, boatIndex, displayIndex, boatCount) {
     const w = state.width;
     const h = state.height;
@@ -830,10 +867,7 @@
     const f = { x: Math.sin(heading), y: Math.cos(heading) };
     const aft = scale(f, -1);
     const starboard = { x: f.y, y: -f.x };
-    const windToStarboard = dot(WIND, starboard);
-    const tackSign = Math.abs(windToStarboard) < 0.015
-      ? (boat.headingDeg >= 0 ? 1 : -1)
-      : Math.sign(windToStarboard);
+    const tackSign = tackSignForHeading(boat.headingDeg, starboard);
     const lee = scale(starboard, tackSign);
     const center = { x: boat.x, y: boat.y };
     const mast = add(center, scale(f, boatLength * 0.10));
@@ -844,13 +878,16 @@
     const downwind = smoothstep(118 * Math.PI / 180, 165 * Math.PI / 180, absHeading * Math.PI / 180);
     const mainAngle = boat.mainDeg * Math.PI / 180;
     const jibAngle = boat.jibDeg * Math.PI / 180;
-    const mainDir = normalize(add(scale(aft, Math.cos(mainAngle)), scale(lee, Math.sin(mainAngle))));
+    const mainSide = Number.isFinite(boat.mainSide) ? boat.mainSide : tackSign;
+    const mainSignedAngle = mainAngle * mainSide;
+    const mainSheetSide = scale(starboard, Math.abs(mainSide) < 0.05 ? tackSign : Math.sign(mainSide));
+    const mainDir = normalize(add(scale(aft, Math.cos(mainSignedAngle)), scale(starboard, Math.sin(mainSignedAngle))));
     const jibSheetSide = downwind > 0.74 ? scale(lee, -1) : lee;
     const jibDir = normalize(add(scale(aft, Math.cos(jibAngle)), scale(jibSheetSide, Math.sin(jibAngle))));
     const sails = [];
 
     const mainChord = boatLength * 0.50;
-    sails.push(makeSail("main", mast, add(mast, scale(mainDir, mainChord)), lee, boatLength, downwind, absHeading, boat));
+    sails.push(makeSail("main", mast, add(mast, scale(mainDir, mainChord)), mainSheetSide, boatLength, downwind, absHeading, boat));
 
     if (boat.rig === "twin") {
       const tack = add(center, scale(f, boatLength * 0.43));
@@ -2213,6 +2250,7 @@
     state.lastTime = now;
     const dt = state.reducedMotion ? elapsed * 0.45 : elapsed;
     updateSteeringDynamics(dt);
+    updateMainsailGybeDynamics(dt);
 
     const scene = buildScene();
     const activeRig = scene.activeRig;
